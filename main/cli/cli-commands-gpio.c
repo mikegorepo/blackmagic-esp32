@@ -24,7 +24,7 @@ typedef struct {
     { .name = pin_name, .gpio_num = GPIO_NUM_##pin_index, .get = true, .set = false }
 
 static const GPIOItem gpio_items[] = {
-    //BOOT
+    // BOOT
     MAKE_IO_READONLY(0),
     MAKE_IO_NAMED_READONLY("BOOT", 0),
     // SWD
@@ -35,7 +35,7 @@ static const GPIOItem gpio_items[] = {
     // I2C_PULL_UP
     MAKE_IO(3),
     MAKE_IO_NAMED("I2C_PULL_UP", 3),
-    // I2C_PULL_UP
+    // LEDs / GPIO
     MAKE_IO(4),
     MAKE_IO_NAMED("LED_BLUE", 4),
     MAKE_IO(5),
@@ -46,7 +46,7 @@ static const GPIOItem gpio_items[] = {
     MAKE_IO(7),
     MAKE_IO(8),
     MAKE_IO(9),
-    // SPI
+    // SPI / SWO
     MAKE_IO(10),
     MAKE_IO_NAMED("SWO", 10),
     MAKE_IO_NAMED("SPI_CS", 10),
@@ -64,6 +64,8 @@ static const GPIOItem gpio_items[] = {
     MAKE_IO(17),
     MAKE_IO(18),
     MAKE_IO(21),
+#if CONFIG_IDF_TARGET_ESP32
+    // Pin di bawah ini hanya ada di ESP32 Xtensa klasik (tidak ada di ESP32-C3)
     MAKE_IO(33),
     MAKE_IO(34),
     MAKE_IO(35),
@@ -71,6 +73,7 @@ static const GPIOItem gpio_items[] = {
     MAKE_IO(37),
     MAKE_IO(38),
     MAKE_IO(39),
+#endif
 };
 
 static void cli_gpio_print_list_set(Cli* cli) {
@@ -156,12 +159,13 @@ void cli_gpio_set(Cli* cli, mstring_t* args) {
             break;
         }
 
-        gpio_config_t io_conf;
-        io_conf.intr_type = GPIO_INTR_DISABLE;
-        io_conf.mode = GPIO_MODE_OUTPUT;
-        io_conf.pin_bit_mask = 0;
-        io_conf.pull_down_en = 0;
-        io_conf.pull_up_en = 0;
+        gpio_config_t io_conf = {
+            .intr_type = GPIO_INTR_DISABLE,
+            .mode = GPIO_MODE_OUTPUT,
+            .pin_bit_mask = 0,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .pull_up_en = GPIO_PULLUP_DISABLE
+        };
 
         bool error = false;
 
@@ -175,7 +179,7 @@ void cli_gpio_set(Cli* cli, mstring_t* args) {
                     error = true;
                     break;
                 } else {
-                    io_conf.pin_bit_mask |= (1LL << (uint64_t)gpio_num);
+                    io_conf.pin_bit_mask |= (1ULL << (uint32_t)gpio_num);
                 }
             } else {
                 error = true;
@@ -190,8 +194,8 @@ void cli_gpio_set(Cli* cli, mstring_t* args) {
 
         gpio_config(&io_conf);
 
-        for(size_t i = 0; i < 64; i++) {
-            if((io_conf.pin_bit_mask & (1LL << (uint64_t)i)) > 0) {
+        for(size_t i = 0; i < SOC_GPIO_PIN_COUNT; i++) {
+            if((io_conf.pin_bit_mask & (1ULL << (uint32_t)i)) > 0) {
                 gpio_set_level(i, (gpio_value > 0));
             }
         }
@@ -212,12 +216,13 @@ void cli_gpio_get(Cli* cli, mstring_t* args) {
             break;
         }
 
-        gpio_config_t io_conf;
-        io_conf.intr_type = GPIO_INTR_DISABLE;
-        io_conf.mode = GPIO_MODE_INPUT;
-        io_conf.pin_bit_mask = 0;
-        io_conf.pull_down_en = 0;
-        io_conf.pull_up_en = 0;
+        gpio_config_t io_conf = {
+            .intr_type = GPIO_INTR_DISABLE,
+            .mode = GPIO_MODE_INPUT,
+            .pin_bit_mask = 0,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .pull_up_en = GPIO_PULLUP_DISABLE
+        };
 
         bool error = false;
         gpio_num_t last_gpio_num = GPIO_NUM_NC;
@@ -232,7 +237,7 @@ void cli_gpio_get(Cli* cli, mstring_t* args) {
                     error = true;
                     break;
                 } else {
-                    if(gpio_num <= last_gpio_num) {
+                    if(gpio_num <= last_gpio_num && last_gpio_num != GPIO_NUM_NC) {
                         cli_printf(
                             cli,
                             "<pin_name> %s is less than or equal to the previous",
@@ -242,7 +247,7 @@ void cli_gpio_get(Cli* cli, mstring_t* args) {
                         break;
                     } else {
                         last_gpio_num = gpio_num;
-                        io_conf.pin_bit_mask |= (1LL << (uint64_t)gpio_num);
+                        io_conf.pin_bit_mask |= (1ULL << (uint32_t)gpio_num);
                     }
                 }
             } else {
@@ -258,8 +263,8 @@ void cli_gpio_get(Cli* cli, mstring_t* args) {
 
         gpio_config(&io_conf);
 
-        for(size_t i = 0; i < 64; i++) {
-            if((io_conf.pin_bit_mask & (1LL << (uint64_t)i)) > 0) {
+        for(size_t i = 0; i < SOC_GPIO_PIN_COUNT; i++) {
+            if((io_conf.pin_bit_mask & (1ULL << (uint32_t)i)) > 0) {
                 cli_printf(cli, "%d ", gpio_get_level(i));
             }
         }

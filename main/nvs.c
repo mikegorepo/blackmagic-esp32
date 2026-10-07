@@ -1,14 +1,17 @@
 #include <nvs_flash.h>
 #include <esp_log.h>
+#include <string.h>
 #include "nvs.h"
 
 #define TAG "nvs"
 #define NVS_STORE "nvs_storage"
 
+static const char* active_nvs_partition = NVS_DEFAULT_PART_NAME;
+
 void nvs_init(void) {
     ESP_LOGI(TAG, "init " NVS_DEFAULT_PART_NAME);
     esp_err_t ret = nvs_flash_init_partition(NVS_DEFAULT_PART_NAME);
-    if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_LOGI(TAG, "erasing " NVS_DEFAULT_PART_NAME);
         ESP_ERROR_CHECK(nvs_flash_erase_partition(NVS_DEFAULT_PART_NAME));
         ret = nvs_flash_init_partition(NVS_DEFAULT_PART_NAME);
@@ -17,12 +20,19 @@ void nvs_init(void) {
 
     ESP_LOGI(TAG, "init " NVS_STORE);
     ret = nvs_flash_init_partition(NVS_STORE);
-    if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_LOGI(TAG, "erasing " NVS_STORE);
         ESP_ERROR_CHECK(nvs_flash_erase_partition(NVS_STORE));
         ret = nvs_flash_init_partition(NVS_STORE);
     }
-    ESP_ERROR_CHECK(ret);
+
+    if (ret == ESP_ERR_NOT_FOUND) {
+        ESP_LOGW(TAG, "Partisi %s tidak ditemukan, menggunakan default: %s", NVS_STORE, NVS_DEFAULT_PART_NAME);
+        active_nvs_partition = NVS_DEFAULT_PART_NAME;
+    } else {
+        ESP_ERROR_CHECK(ret);
+        active_nvs_partition = NVS_STORE;
+    }
 
     ESP_LOGI(TAG, "init done");
 }
@@ -32,9 +42,12 @@ void nvs_erase(void) {
     ESP_ERROR_CHECK(nvs_flash_erase());
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    ESP_LOGI(TAG, "erasing " NVS_STORE);
-    ESP_ERROR_CHECK(nvs_flash_erase_partition(NVS_STORE));
-    ESP_ERROR_CHECK(nvs_flash_init_partition(NVS_STORE));
+    // Gunakan strcmp untuk membandingkan isi string
+    if (strcmp(active_nvs_partition, NVS_DEFAULT_PART_NAME) != 0) {
+        ESP_LOGI(TAG, "erasing " NVS_STORE);
+        ESP_ERROR_CHECK(nvs_flash_erase_partition(NVS_STORE));
+        ESP_ERROR_CHECK(nvs_flash_init_partition(NVS_STORE));
+    }
 
     ESP_LOGI(TAG, "erasing done");
 }
@@ -44,14 +57,14 @@ esp_err_t nvs_save_string(const char* key, const mstring_t* value) {
     esp_err_t err;
 
     do {
-        err = nvs_open_from_partition(NVS_STORE, "config", NVS_READWRITE, &nvs_handle);
-        if(err != ESP_OK) break;
+        err = nvs_open_from_partition(active_nvs_partition, "config", NVS_READWRITE, &nvs_handle);
+        if (err != ESP_OK) break;
 
         err = nvs_set_str(nvs_handle, key, mstring_get_cstr(value));
-        if(err != ESP_OK) break;
+        if (err != ESP_OK) break;
 
         err = nvs_commit(nvs_handle);
-        if(err != ESP_OK) break;
+        if (err != ESP_OK) break;
 
         nvs_close(nvs_handle);
         err = ESP_OK;
@@ -66,23 +79,28 @@ esp_err_t nvs_load_string(const char* key, mstring_t* value) {
     char* buffer = NULL;
 
     do {
-        err = nvs_open_from_partition(NVS_STORE, "config", NVS_READONLY, &nvs_handle);
-        if(err != ESP_OK) break;
+        err = nvs_open_from_partition(active_nvs_partition, "config", NVS_READONLY, &nvs_handle);
+        if (err != ESP_OK) break;
 
         size_t required_size = 0;
         err = nvs_get_str(nvs_handle, key, NULL, &required_size);
-        if(err != ESP_OK) break;
+        if (err != ESP_OK) break;
 
         buffer = malloc(required_size + sizeof(uint32_t));
+        if (!buffer) {
+            err = ESP_ERR_NO_MEM;
+            break;
+        }
+
         err = nvs_get_str(nvs_handle, key, buffer, &required_size);
-        if(err != ESP_OK) break;
+        if (err != ESP_OK) break;
 
         mstring_set(value, buffer);
         nvs_close(nvs_handle);
         err = ESP_OK;
     } while(0);
 
-    if(buffer != NULL) free(buffer);
+    if (buffer != NULL) free(buffer);
 
     return err;
 }

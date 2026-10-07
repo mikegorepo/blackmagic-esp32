@@ -14,6 +14,7 @@
 #include "led.h"
 #include <gdb-glue.h>
 #include <platform.h>
+#include <driver/gpio.h>
 
 static const char* TAG = "main";
 
@@ -25,18 +26,14 @@ void gdb_application_thread(void* pvParameters) {
     ESP_LOGI("gdb", "end");
 }
 
-#include <platform.h>
-#include <driver/gpio.h>
-
 void app_main(void) {
     ESP_LOGI(TAG, "start");
 
     platform_init();
     gdb_glue_init();
 
-    led_init();
-    led_set_blue(255);
-
+    led_init(); // <-- UNCOMMENT BARIS INI
+    
     nvs_init();
     network_init();
 
@@ -45,6 +42,6 @@ void app_main(void) {
 
     cli_uart_init();
 
-    xTaskCreatePinnedToCore(&gdb_application_thread, "gdb_thread", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(&gdb_application_thread, "gdb_thread", 4096, NULL, 5, NULL, 0);
     ESP_LOGI(TAG, "end");
 }

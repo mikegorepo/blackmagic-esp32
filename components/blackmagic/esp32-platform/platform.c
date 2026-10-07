@@ -7,7 +7,6 @@
 #include <driver/gpio.h>
 #include <rom/ets_sys.h>
 
-#include <hal/gpio_ll.h>
 #include <esp_rom_gpio.h>
 #include <esp_timer.h>
 #include <esp_private/esp_clk.h>
@@ -15,72 +14,39 @@
 uint32_t swd_delay_cnt = 0;
 // static const char* TAG = "gdb-platform";
 
-void __attribute__((always_inline)) platform_swdio_mode_float(void) {
-    // gpio_set_direction(SWDIO_PIN, GPIO_MODE_INPUT);
-    // gpio_set_pull_mode(SWDIO_PIN, GPIO_FLOATING);
-
-    // Faster variant
-    gpio_ll_output_disable(&GPIO, SWDIO_PIN);
-    gpio_ll_input_enable(&GPIO, SWDIO_PIN);
+void inline platform_swdio_mode_float(void) {
+    gpio_set_direction((gpio_num_t)SWDIO_PIN, GPIO_MODE_INPUT);
 }
 
-void __attribute__((always_inline)) platform_swdio_mode_drive(void) {
-    // gpio_set_direction(SWDIO_PIN, GPIO_MODE_OUTPUT);
-    // gpio_set_pull_mode(SWDIO_PIN, GPIO_FLOATING);
-
-    // Faster variant
-    // Supports only gpio less than 32
-    GPIO.enable_w1ts = (0x1 << SWDIO_PIN);
-    esp_rom_gpio_connect_out_signal(SWDIO_PIN, SIG_GPIO_OUT_IDX, false, false);
+void inline platform_swdio_mode_drive(void) {
+    gpio_set_direction((gpio_num_t)SWDIO_PIN, GPIO_MODE_OUTPUT);
 }
 
-void __attribute__((always_inline)) platform_gpio_set_level(int32_t gpio_num, uint32_t value) {
-    // gpio_set_level(gpio_num, value);
-
-    // Faster variant
-    // Supports only gpio less than 32
-    if(value) {
-        GPIO.out_w1ts = (1 << gpio_num);
-    } else {
-        GPIO.out_w1tc = (1 << gpio_num);
-    }
+void inline platform_gpio_set_level(int32_t gpio_num, uint32_t value) {
+    gpio_set_level((gpio_num_t)gpio_num, value);
 }
 
-void __attribute__((always_inline)) platform_gpio_set(int32_t gpio_num) {
-    // platform_gpio_set_level(gpio_num, 1);
-
-    // Faster variant
-    // Supports only gpio less than 32
-    GPIO.out_w1ts = (1 << gpio_num);
+void inline platform_gpio_set(int32_t gpio_num) {
+    gpio_set_level((gpio_num_t)gpio_num, 1);
 }
 
-void __attribute__((always_inline)) platform_gpio_clear(int32_t gpio_num) {
-    // platform_gpio_set_level(gpio_num, 0);
-
-    // faster variant
-    // supports only gpio less than 32
-    GPIO.out_w1tc = (1 << gpio_num);
+void inline platform_gpio_clear(int32_t gpio_num) {
+    gpio_set_level((gpio_num_t)gpio_num, 0);
 }
 
-int __attribute__((always_inline)) platform_gpio_get_level(int32_t gpio_num) {
-    // int level = gpio_get_level(gpio_num);
-
-    // Faster variant
-    // Supports only gpio less than 32
-    int level = (GPIO.in >> gpio_num) & 0x1;
-    return level;
+int inline platform_gpio_get_level(int32_t gpio_num) {
+    return gpio_get_level((gpio_num_t)gpio_num);
 }
 
 // init platform
 void platform_init() {
-    gpio_config_t io_conf;
-
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-
-    io_conf.pin_bit_mask = ((1 << SWCLK_PIN) | (1 << SWDIO_PIN));
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_DISABLE,
+        .mode = GPIO_MODE_OUTPUT,
+        .pin_bit_mask = ((1ULL << SWCLK_PIN) | (1ULL << SWDIO_PIN)),
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE
+    };
 
     gpio_config(&io_conf);
 
@@ -110,7 +76,7 @@ uint32_t platform_time_ms(void) {
 
 // delay ms
 void platform_delay(uint32_t ms) {
-    vTaskDelay((ms) / portTICK_PERIOD_MS);
+    vTaskDelay(ms / portTICK_PERIOD_MS);
 }
 
 // hardware version
@@ -130,7 +96,11 @@ bool platform_timeout_is_expired(const platform_timeout_s* t) {
 
 // set interface freq
 void platform_max_frequency_set(uint32_t freq) {
+    // Gunakan fallback jika esp_clk_cpu_freq() mengembalikan 0
     uint32_t cpu_freq = esp_clk_cpu_freq();
+    if (cpu_freq == 0) {
+        cpu_freq = 160000000; // 160 MHz default C3
+    }
 
     if(freq < 50000) return;
 

@@ -3,65 +3,73 @@
 #include <esp_log.h>
 #include <esp_err.h>
 
-#define LED_PIN_RED (21)
-#define LED_PIN_GREEN (22)
-#define LED_PIN_BLUE (23)
+// Gunakan pin aman yang ada di ESP32-C3 (Sesuaikan dengan skema hardware Anda)
+#define LED_PIN_RED   (6)
+#define LED_PIN_GREEN (5)
+#define LED_PIN_BLUE  (4)
 
 #define LEDC_MODE LEDC_LOW_SPEED_MODE
 
 #define TAG "led"
 
-#define LED_PWM_MAX_VAL 256U
+// Untuk 8-bit resolution, max value adalah 255 (2^8 - 1)
+#define LED_PWM_MAX_VAL 255U
 
-#define LED_RED_MAX_VAL 20U
+#define LED_RED_MAX_VAL   20U
 #define LED_GREEN_MAX_VAL 20U
-#define LED_BLUE_MAX_VAL 20U
+#define LED_BLUE_MAX_VAL  20U
 
 typedef enum {
-    LedChannelRed,
+    LedChannelRed = 0,
     LedChannelGreen,
     LedChannelBlue,
 } ledc_channel;
 
-void led_init() {
+void led_init(void) {
     ESP_LOGI(TAG, "init");
+    
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = LEDC_MODE,
-        .timer_num = LEDC_TIMER_0,
-        .duty_resolution = LEDC_TIMER_8_BIT,
-        .freq_hz = 5000, // Set output frequency at 5 kHz
-        .clk_cfg = LEDC_AUTO_CLK};
+        .speed_mode       = LEDC_MODE,
+        .timer_num        = LEDC_TIMER_0,
+        .duty_resolution  = LEDC_TIMER_8_BIT,
+        .freq_hz          = 5000,
+        .clk_cfg          = LEDC_AUTO_CLK
+    };
     ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 
     ledc_channel_config_t ledc_channel_red = {
         .speed_mode = LEDC_MODE,
-        .channel = LedChannelRed,
-        .timer_sel = LEDC_TIMER_0,
-        .intr_type = LEDC_INTR_DISABLE,
-        .gpio_num = LED_PIN_RED,
-        .duty = LED_PWM_MAX_VAL, // Set duty to 100%
-        .hpoint = 0};
+        .channel    = LedChannelRed,
+        .timer_sel  = LEDC_TIMER_0,
+        .intr_type  = LEDC_INTR_DISABLE,
+        .gpio_num   = LED_PIN_RED,
+        .duty       = LED_PWM_MAX_VAL,
+        .hpoint     = 0
+    };
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel_red));
 
     ledc_channel_config_t ledc_channel_green = {
         .speed_mode = LEDC_MODE,
-        .channel = LedChannelGreen,
-        .timer_sel = LEDC_TIMER_0,
-        .intr_type = LEDC_INTR_DISABLE,
-        .gpio_num = LED_PIN_GREEN,
-        .duty = LED_PWM_MAX_VAL, // Set duty to 100%
-        .hpoint = 0};
+        .channel    = LedChannelGreen,
+        .timer_sel  = LEDC_TIMER_0,
+        .intr_type  = LEDC_INTR_DISABLE,
+        .gpio_num   = LED_PIN_GREEN,
+        .duty       = LED_PWM_MAX_VAL,
+        .hpoint     = 0
+    };
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel_green));
 
     ledc_channel_config_t ledc_channel_blue = {
         .speed_mode = LEDC_MODE,
-        .channel = LedChannelBlue,
-        .timer_sel = LEDC_TIMER_0,
-        .intr_type = LEDC_INTR_DISABLE,
-        .gpio_num = LED_PIN_BLUE,
-        .duty = LED_PWM_MAX_VAL, // Set duty to 100%
-        .hpoint = 0};
+        .channel    = LedChannelBlue,
+        .timer_sel  = LEDC_TIMER_0,
+        .intr_type  = LEDC_INTR_DISABLE,
+        .gpio_num   = LED_PIN_BLUE,
+        .duty       = LED_PWM_MAX_VAL,
+        .hpoint     = 0
+    };
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel_blue));
+
     ESP_LOGI(TAG, "init done");
 }
 

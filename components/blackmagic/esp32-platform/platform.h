@@ -41,8 +41,8 @@ void led_set_blue(uint8_t value);
 
 // ON ESP32 we dont have the PORTS, this is dummy value until code is corrected
 #define SWCLK_PORT (0)
-#define SWCLK_PIN (25)
-#define SWDIO_PIN (26)
+#define SWCLK_PIN (4)
+#define SWDIO_PIN (5)
 
 #if SWDIO_PIN >= 32 || SWCLK_PIN >= 32
 #error To support pins greater than 31, change the platform_gpio functions
